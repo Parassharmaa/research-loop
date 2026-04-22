@@ -89,6 +89,59 @@ Single-seed results are anecdotes. For any reportable result:
 - **Statistical test** when comparing variants (paired t-test, Wilcoxon, or bootstrapped CI). Log the test and p-value in LEARNINGS.
 - Effect size (Cohen's d) beats p-value for meaningful comparison.
 
+## Evaluation tooling (2026 stack)
+
+Don't hand-roll eval loops. Use standardized harnesses — results compare cleanly with published numbers.
+
+### Standardized benchmarks
+
+- **`lm-eval-harness`** (EleutherAI) — the de facto standard for LLM evals. Covers MMLU, HellaSwag, GSM8K, HumanEval, ARC, TruthfulQA, BBH, and hundreds more.
+
+  ```bash
+  pip install lm-eval
+  lm_eval --model vllm \
+      --model_args pretrained=<org>/<model>,dtype=bfloat16,tensor_parallel_size=1 \
+      --tasks mmlu,gsm8k,hellaswag \
+      --batch_size auto \
+      --output_path runs/<ts>/eval/
+  ```
+
+  Backing with **vLLM** instead of HF `generate` is ~20× faster on the same GPU. Use it unless the eval method requires log-prob scoring of many short completions (where HF direct is fine).
+
+- **`olmes`** (AI2) — newer, better reproducibility discipline (explicit prompt variants, formatted metrics). Worth running alongside `lm-eval-harness` for headline results.
+
+### LLM-as-judge
+
+For open-ended tasks (chat quality, creativity, following nuanced instructions), there's no ground truth. Use a strong model as judge.
+
+- **`trulens`** / **`openevals`** — structured LLM-as-judge with rubrics, confidence, consistency checks.
+- **MT-Bench** + **AlpacaEval 2** — community-calibrated chat benchmarks; results compare to public leaderboards.
+
+Guardrails for judge-based eval:
+
+1. **Use a different model family for judge vs. subject.** GPT-4 judging a GPT-4-distilled model is contaminated.
+2. **Randomize position.** Judge bias toward the first-presented answer is real; swap A/B halfway.
+3. **Multiple judges, majority vote.** Single-judge numbers are noisy; 3 judges + majority ≈ human correlation.
+4. **Publish the judge prompt** in your model card. Non-reproducible judges are not results.
+
+### Contamination checks
+
+Before publishing any benchmark number, verify the eval set didn't leak into training data:
+
+- `datasets` + `datasketch` MinHash between training corpus and eval set.
+- For chat models, check `LMSYS-1M` contamination specifically (very commonly leaks).
+- Log the contamination check result in `LEARNINGS.md` — this is what reviewers will ask.
+
+### Eval budget for a typical run
+
+| Scope | Tasks | Wall-time (vLLM on 1 H100) |
+|---|---|---|
+| Smoke test | `gsm8k`, `hellaswag` | ~15 min |
+| Standard chat eval | MMLU + GSM8K + HumanEval + MT-Bench + AlpacaEval | ~3 h |
+| Thorough | Above + `bbh` + `arc_challenge` + `truthfulqa` + `ifeval` | ~8 h |
+
+Budget eval into the training plan — it's often 10–30 % of the total GPU spend on a serious release.
+
 ## Stage 5 deliverables
 
 When shipping:

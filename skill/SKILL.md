@@ -1,7 +1,7 @@
 ---
 name: research-loop
-description: "ML-engineering loop — literature-first reproduction and training across any GPU provider (Hugging Face Jobs, RunPod, Modal, Lambda, CoreWeave, Together, local). Use when the user asks to reproduce a paper, fine-tune or pretrain a model, build a benchmark, ship a model to a hub, or launch a training job on a cloud GPU. Enforces a five-stage loop — literature, validate, sandbox, approval, ship — so GPU hours aren't burned on preventable bugs."
-when_to_use: 'Trigger on "reproduce this paper", "fine-tune X on Y", "train a model", "run this on RunPod / Modal / HF Jobs / Lambda", "build a benchmark", "push this model to the Hub", "SFT / DPO / GRPO / LoRA", or any request that involves ML training on GPUs.'
+description: "USE THIS SKILL whenever the user wants to train, fine-tune, post-train (SFT, DPO, GRPO, ORPO, KTO, SimPO, LoRA, QLoRA, DoRA), pretrain, reproduce a paper, benchmark models, generate synthetic data, merge models, or serve a trained model. Provider-agnostic across Hugging Face Jobs, RunPod, Modal, Lambda, CoreWeave, Together, and local GPUs. Enforces a five-stage loop — literature → validate → sandbox → approval → ship — plus project scaffolding (numbered scripts, configs/, runs/, LEARNINGS.md) and leakage-aware evaluation so GPU hours aren't burned on preventable bugs."
+when_to_use: 'Trigger on any ML training, fine-tuning, post-training, pretraining, evaluation, synthetic-data, model-merging, or model-serving request. Keywords: "train", "fine-tune", "pretrain", "reproduce this paper", "SFT", "DPO", "GRPO", "ORPO", "KTO", "SimPO", "LoRA", "QLoRA", "DoRA", "benchmark", "push to the Hub", "run this on RunPod / Modal / HF Jobs / Lambda", "synthetic data", "distilabel", "mergekit", "serve this model", "vLLM", "TGI". Invoke proactively the moment GPUs or training frameworks are mentioned — do not wait for the user to ask for the skill by name.'
 argument-hint: "[paper-or-task] [dataset?] [base-model?] [provider?]"
 allowed-tools: Read Write Edit Glob Grep Bash Agent WebFetch WebSearch
 ---
@@ -118,6 +118,13 @@ Always name a benchmark at the end of stage 1. "Match or beat `<author, year>` `
 
 Default to **multi-seed** (minimum 3, ideally 5). Single-seed results are anecdotes. Report mean ± std and an effect size when comparing variants. See `references/evaluation.md`.
 
+## Scripts
+
+Runnable helpers that do actual work (not just tell Claude what to do):
+
+- `scripts/init_project.py <dir>` — scaffolds the full project layout (`configs/`, `scripts/`, `src/<pkg>/`, `data/`, `literature/`, `runs/`, `results/`, `paper/`) with `CLAUDE.md`, `LEARNINGS.md`, `README.md`, `.gitignore`, `configs/base.yaml`. Idempotent.
+- `scripts/check_placeholders.py [paths…]` — greps for unresolved `XX`, `TODO`, `FIXME`, `???` before shipping a paper or model card. Non-zero exit on any hit. Use as pre-submit check.
+
 ## References
 
 - `references/setup.md` — install MCP servers + CLIs for each provider.
@@ -126,7 +133,12 @@ Default to **multi-seed** (minimum 3, ideally 5). Single-seed results are anecdo
 - `references/approval-template.md` — the message format for the stage-4 approval ask.
 - `references/project-scaffold.md` — numbered scripts + `configs/` + `runs/` layout.
 - `references/learnings-log.md` — `LEARNINGS.md` decision-log convention.
-- `references/evaluation.md` — leakage-aware CV, benchmarks, uncertainty, metadata.
+- `references/training-stack.md` — FSDP2, Liger, Unsloth, FP8, torch.compile, uv.
+- `references/post-training-methods.md` — SFT / DPO / SimPO / KTO / ORPO / GRPO decision tree.
+- `references/synthetic-data.md` — `distilabel`, Magpie, LLM-as-judge preference pairs.
+- `references/model-merging.md` — `mergekit` (SLERP / TIES / DARE) as an alternative to re-training.
+- `references/evaluation.md` — leakage-aware CV, benchmarks, `lm-eval-harness`, LLM-as-judge, metadata.
+- `references/serving.md` — vLLM / TGI / Modal endpoints / RunPod Serverless / Spaces.
 - `references/providers/huggingface.md` — HF Jobs tool surface + submit commands.
 - `references/providers/runpod.md` — RunPod MCP + pod/serverless submission.
 - `references/providers/modal.md` — Modal CLI + `@app.function` patterns.
