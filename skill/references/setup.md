@@ -1,49 +1,77 @@
-# Hugging Face MCP — setup
+# Setup — MCP servers and CLIs per provider
 
-The `research-loop` skill relies on the official HF MCP server for Hub access (papers, datasets, models, Jobs). Install it once per machine.
+The `research-loop` skill is provider-agnostic. Install whichever backends you want to use. At least one is required. HF is recommended regardless because its paper/dataset/model search MCP is useful for stage 1 even if you train elsewhere.
 
-## Install (Claude Code)
+## Hugging Face (recommended — at minimum for paper + dataset search)
+
+Remote HTTP MCP server, no local install:
 
 ```bash
 claude mcp add --transport http huggingface https://huggingface.co/mcp
-```
-
-Then log in via the HF CLI so the MCP can use your token:
-
-```bash
 huggingface-cli login
 ```
 
-Or set `HF_TOKEN` in your shell profile. Get a token at <https://huggingface.co/settings/tokens> — scope: **read + write** (write is needed for `push_to_hub` and Jobs).
+Tools appear as `mcp__huggingface__*`. Covers: paper search, dataset/model inspection, repo file read/write, HF Jobs submit and logs, Spaces.
+
+See `providers/huggingface.md`.
+
+## RunPod
+
+Official local MCP server over stdio:
+
+```bash
+claude mcp add runpod npx '@runpod/mcp-server@latest' \
+  -e RUNPOD_API_KEY=rpa_...
+```
+
+Get an API key at <https://www.runpod.io/console/user/settings>. Tools cover Pods, Serverless endpoints, templates, network volumes, container registries.
+
+See `providers/runpod.md`.
+
+## Modal
+
+No official MCP server as of this writing. Use the Modal CLI directly via Bash — Claude Code can drive it fine.
+
+```bash
+pip install modal                   # latest; pin in your project if needed
+modal token new                     # browser auth flow, writes ~/.modal.toml
+```
+
+Verify: `modal profile current`. See `providers/modal.md` for the `@app.function(gpu=...)` patterns the skill will generate.
+
+## Lambda Labs / CoreWeave / Together / bare metal
+
+No MCP servers. The skill falls back to SSH + `scp` (Lambda, CoreWeave) or their REST APIs via `curl`/`requests` (Together). For Lambda:
+
+```bash
+# ensure you have ssh keys uploaded to Lambda, and an active instance
+ssh -i ~/.ssh/lambda.pem ubuntu@<instance-ip>
+```
+
+See `providers/lambda.md` for the full submit pattern (rsync code, run tmux + training script, rsync checkpoints back).
+
+## GitHub MCP (optional but recommended)
+
+Code search is how stage 1 finds reference implementations. If you already have `gh` CLI authed, Claude Code can use it via Bash — no MCP needed. If you want richer search, install the GitHub MCP:
+
+```bash
+claude mcp add --transport http github https://api.githubcopilot.com/mcp
+```
+
+(Requires GitHub Copilot. Otherwise rely on `gh search code` + WebFetch.)
 
 ## Verify
 
-Inside Claude Code:
+Inside a Claude Code session:
 
 ```
 /mcp
 ```
 
-You should see `huggingface` listed as connected. Tools will appear as `mcp__huggingface__*` (exact names vary by MCP version — use `/mcp` to list).
+Should list every server you installed as **connected**. If a server shows **disconnected**, check the relevant API key in env.
 
-## Minimum tool surface the skill expects
+## Token hygiene
 
-Names differ across MCP versions, but the skill assumes the following *capabilities* are reachable. Map them to whatever the current HF MCP exposes:
-
-| Capability | Used in stage |
-|---|---|
-| Search papers (arXiv / HF Papers) | 1 — literature |
-| Fetch paper full text or sections | 1 — literature |
-| Search / inspect datasets on the Hub | 2 — validation |
-| Search / inspect models on the Hub | 2 — validation |
-| Read files from a Hub repo | 1, 2 |
-| Submit HF Jobs (CPU + GPU) | 3, 4 |
-| Read HF Jobs logs and status | 5 — ship |
-| Create / update Hub repos, push files | 5 — ship |
-
-If any are missing in your installed version, fall back to direct HTTP via `huggingface_hub` Python SDK in a Bash step — but prefer MCP so the user sees approval prompts.
-
-## Other MCP servers that play nicely
-
-- **GitHub MCP** (`claude mcp add github ...`) — for finding reference implementations in stage 1, code search in stage 3.
-- **Filesystem MCP** — usually not needed; Claude Code's native tools cover this.
+- Never commit `~/.modal.toml`, `RUNPOD_API_KEY`, or HF tokens.
+- Prefer scoped tokens: HF tokens should be read + write, not admin. RunPod supports restricted keys per pod.
+- Rotate after any shared-screen demo.
